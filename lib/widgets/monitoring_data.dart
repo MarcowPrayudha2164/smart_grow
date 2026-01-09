@@ -14,15 +14,14 @@ class _WidgetMonitoringDataState extends State<WidgetMonitoringData> {
 
   // Data semua sensor
   double _temperature = 0.0;
-  double _soilHumidity = 0.0;
+  int _soilHumidity = 0;
   double _waterLevel = 0.0;
   double _waterQuality = 0.0;
-  double _ph = 6.2; // Default statis
+  double _ph = 6.2;
 
   // Status data
   bool _hasTempData = false;
   bool _hasSoilData = false;
-  bool _hasAirHumidityData = false;
   bool _hasWaterLevelData = false;
   bool _hasWaterQualityData = false;
   bool _hasPhData = false;
@@ -107,20 +106,20 @@ class _WidgetMonitoringDataState extends State<WidgetMonitoringData> {
 
     return _buildSensorCard(
       label: "Suhu Ruangan",
-      subLabel: "Sensor DHT11",
+      subLabel: "Sensor DHT",
       icon: Icons.thermostat_rounded,
       value: value,
       isActive: isActive,
-      activeColor: Colors.orange,
-      iconColor: Colors.orange,
+      activeColor: Colors.grey,
+      iconColor: greenColor,
     );
   }
 
   Widget _buildSoilHumidityCard() {
-    final value = _hasSoilData ? "${_soilHumidity.toStringAsFixed(1)}%" : "0%";
+    final value = _hasSoilData ? "$_soilHumidity%" : "0%";
     final isActive = _hasSoilData;
     return _buildSensorCard(
-      label: "Kelembapan\nTanah",
+      label: "Kelembapan",
       subLabel: "Sensor Soil",
       value: value,
       icon: Icons.grass_outlined,
@@ -138,12 +137,12 @@ class _WidgetMonitoringDataState extends State<WidgetMonitoringData> {
 
     return _buildSensorCard(
       label: "Level Air",
-      subLabel: "Jarak Sensor",
+      subLabel: "Sensor Jarak",
       icon: Icons.water_outlined,
       value: value,
       isActive: isActive,
-      activeColor: Colors.blue,
-      iconColor: Colors.blue,
+      activeColor: Colors.grey,
+      iconColor: greenColor,
     );
   }
 
@@ -155,11 +154,11 @@ class _WidgetMonitoringDataState extends State<WidgetMonitoringData> {
 
     return _buildSensorCard(
       label: "Kualitas Air",
-      subLabel: "TDS Sensor",
+      subLabel: "Sensor TDS",
       icon: Icons.water_drop_rounded,
       value: value,
       isActive: isActive,
-      activeColor: Colors.teal,
+      activeColor: Colors.grey,
       iconColor: Colors.teal,
     );
   }
@@ -256,7 +255,7 @@ class _WidgetMonitoringDataState extends State<WidgetMonitoringData> {
           ),
           // Icon
           Container(
-            margin: const EdgeInsets.only(right: 10),
+            margin: const EdgeInsets.only(right: 5),
             child: Icon(
               icon,
               color: isActive ? iconColor : Colors.grey,
@@ -304,14 +303,13 @@ class _WidgetMonitoringDataState extends State<WidgetMonitoringData> {
     final activeSensors = [
       if (_hasTempData) 'Suhu',
       if (_hasSoilData) 'Tanah',
-      if (_hasAirHumidityData) 'Udara',
       if (_hasWaterLevelData) 'Level Air',
       if (_hasWaterQualityData) 'Kualitas',
       if (_hasPhData) 'pH',
     ];
 
     final activeCount = activeSensors.length;
-    final totalSensors = 6;
+    final totalSensors = 5;
 
     return Container(
       padding: const EdgeInsets.all(10),
@@ -325,6 +323,8 @@ class _WidgetMonitoringDataState extends State<WidgetMonitoringData> {
         ),
       ),
       child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           Row(
             mainAxisAlignment: MainAxisAlignment.center,

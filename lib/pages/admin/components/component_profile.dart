@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:smart_grow/auth/login_screen.dart';
 import 'package:smart_grow/components/colors.dart';
 import 'package:awesome_dialog/awesome_dialog.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class ComponentProfileAdmin extends StatefulWidget {
   const ComponentProfileAdmin({super.key});
@@ -11,6 +12,16 @@ class ComponentProfileAdmin extends StatefulWidget {
 }
 
 class _ComponentProfileAdminState extends State<ComponentProfileAdmin> {
+  Future<void> logout(BuildContext context) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.clear();
+    Navigator.pushNamedAndRemoveUntil(
+      context,
+      LoginScreen.routeName,
+      (route) => false,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -121,7 +132,7 @@ class _ComponentProfileAdminState extends State<ComponentProfileAdmin> {
               btnOkColor: Colors.teal,
               btnCancelColor: Colors.red,
               btnOkOnPress: () {
-                Navigator.pushReplacementNamed(context, LoginScreen.routeName);
+                logout(context);
               },
               btnCancelOnPress: () {},
             ).show();

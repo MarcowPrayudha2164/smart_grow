@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:awesome_dialog/awesome_dialog.dart';
 import 'package:smart_grow/auth/login_screen.dart';
 import 'package:smart_grow/components/colors.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class ComponentUserProfile extends StatefulWidget {
   const ComponentUserProfile({super.key});
@@ -11,6 +12,16 @@ class ComponentUserProfile extends StatefulWidget {
 }
 
 class _ComponentUserProfileState extends State<ComponentUserProfile> {
+  Future<void> logout(BuildContext context) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.clear();
+    Navigator.pushNamedAndRemoveUntil(
+      context,
+      LoginScreen.routeName,
+      (route) => false,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -42,7 +53,7 @@ class _ComponentUserProfileState extends State<ComponentUserProfile> {
                   alignment: Alignment.center,
                   margin: const EdgeInsets.only(top: 20),
                   child: Text(
-                    "JinX Pravolensky",
+                    "Pengguna Green House",
                     textAlign: TextAlign.center,
                     overflow: TextOverflow.visible,
                     style: TextStyle(
@@ -125,7 +136,7 @@ class _ComponentUserProfileState extends State<ComponentUserProfile> {
               btnOkColor: Colors.teal,
               btnCancelColor: Colors.red,
               btnOkOnPress: () {
-                Navigator.pushReplacementNamed(context, LoginScreen.routeName);
+                logout(context);
               },
               btnCancelOnPress: () {},
             ).show();

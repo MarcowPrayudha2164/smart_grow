@@ -8,6 +8,7 @@ class PumpControlPage extends StatefulWidget {
   const PumpControlPage({super.key});
 
   @override
+  
   State<PumpControlPage> createState() => _PumpControlPageState();
 }
 
@@ -15,23 +16,50 @@ class _PumpControlPageState extends State<PumpControlPage> {
   bool pump1 = false;
   bool pump2 = false;
 
-  final String apiUrl = "http://192.168.18.6:3000/api/pump";
+  final String apiUrl = "https://punctuative-sanctionable-briana.ngrok-free.dev/api/pump";
 
-  Future<void> controlPump(int pump, bool status) async {
-    try {
-      await http.post(
-        Uri.parse(apiUrl),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          "device": "smartgrow-01",
-          "pump": 2,
-          "status": status ? "ON" : "OFF",
-        }),
-      );
-    } catch (e) {
-      debugPrint("Failed send data: $e");
+  void didChangeDependencies() {
+  super.didChangeDependencies();
+  fetchPumpStatus(); // refresh setiap halaman aktif kembali
+}
+  void initState() {
+  super.initState();
+  fetchPumpStatus();
+}
+  Future<void> fetchPumpStatus() async {
+  try {
+    final res = await http.get(Uri.parse(apiUrl));
+
+    if (res.statusCode == 200) {
+      final data = jsonDecode(res.body);
+
+      setState(() {
+        pump1 = data["pump1"] == "ON";
+        pump2 = data["pump2"] == "ON";
+      });
     }
+  } catch (e) {
+    debugPrint("Fetch status error: $e");
   }
+}
+  Future<void> controlPump(int pump, bool status) async {
+  try {
+    final res = await http.post(
+      Uri.parse(apiUrl),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        "device": "smartgrow-01",
+        "pump": pump,
+        "status": status ? "ON" : "OFF",
+      }),
+    );
+
+    debugPrint("STATUS: ${res.statusCode}");
+    debugPrint("BODY: ${res.body}");
+  } catch (e) {
+    debugPrint("Failed send data: $e");
+  }
+}
 
   void showPumpNotification(String pumpName, bool status) {
     AwesomeDialog(

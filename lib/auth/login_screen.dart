@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:smart_grow/components/colors.dart';
 import 'package:smart_grow/components/size_config.dart';
 import 'package:smart_grow/auth/component_login.dart' show ComponentFormLogin;
+import 'package:smart_grow/pages/admin/admin_dashboard.dart';
 
 class LoginScreen extends StatelessWidget {
   const LoginScreen({super.key});
@@ -69,6 +70,12 @@ class _BodyLoginState extends State<BodyLogin> {
           margin: const EdgeInsets.only(left: 15, right: 15),
           child: const ComponentFormLogin(),
         ),
+        // Container(
+        //   margin: const EdgeInsets.only(top: 20),
+        //   child: TextButton(onPressed: () {
+        //     Navigator.pushNamed(context, DashboardAdminScreen.routeName);
+        //   }, child: Text("Admin")),
+        // )
       ],
     );
   }
