@@ -11,7 +11,7 @@ class WidgetMonitoringData extends StatefulWidget {
 
 class _WidgetMonitoringDataState extends State<WidgetMonitoringData> {
   final RabbitMQSingleton _rabbitMQ = RabbitMQSingleton();
-
+ 
   // Data semua sensor
   double _temperature = 0.0;
   int _soilHumidity = 0;
