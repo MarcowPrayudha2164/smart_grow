@@ -16,12 +16,14 @@ class _PumpControlPageState extends State<PumpControlPage> {
   bool pump1 = false;
   bool pump2 = false;
 
-  final String apiUrl = "https://punctuative-sanctionable-briana.ngrok-free.dev/api/pump";
+  final String apiUrl = "https://70a64ec9fbb2.ngrok-free.app/api/pump";
 
+  @override
   void didChangeDependencies() {
   super.didChangeDependencies();
   fetchPumpStatus(); // refresh setiap halaman aktif kembali
 }
+  @override
   void initState() {
   super.initState();
   fetchPumpStatus();

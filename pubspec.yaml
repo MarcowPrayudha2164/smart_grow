@@ -18,6 +18,7 @@ dependencies:
   dart_amqp: ^0.3.1
   provider: ^6.1.5+1
   shared_preferences: ^2.5.4
+  intl: ^0.20.2
 
 dev_dependencies:
   flutter_test:

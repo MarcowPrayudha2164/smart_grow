@@ -88,7 +88,6 @@ class BodyHistoryAdmin extends StatelessWidget {
             ],
           ),
         ),
-        const SizedBox(height: 10),
         const WidgetHistoryData(),
       ],
     );

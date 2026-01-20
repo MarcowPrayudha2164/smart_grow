@@ -1,0 +1,506 @@
+import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
+import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'package:intl/intl.dart';
+
+class WidgetHistoryData extends StatefulWidget {
+  const WidgetHistoryData({super.key});
+
+  @override
+  State<WidgetHistoryData> createState() => _WidgetHistoryDataState();
+}
+
+class _WidgetHistoryDataState extends State<WidgetHistoryData> {
+  List<Map<String, dynamic>> sensorData = [];
+  bool isLoading = true;
+  bool useMockData = false;
+  String errorMessage = "";
+
+  // Base URL
+  final String baseUrl = "https://backendappsgh-project.up.railway.app/api";
+
+  @override
+  void initState() {
+    super.initState();
+    fetchAllSensorData();
+  }
+
+  Future<void> fetchAllSensorData() async {
+    try {
+      print("🔄 Mengambil data dari semua endpoint...");
+
+      // Ambil data dari semua endpoint secara paralel
+      final responses = await Future.wait([
+        // 1. Actuator history (untuk timestamp & pump status)
+        _fetchApiData("/actuator-history/latest", "actuator"),
+        
+        // 2. DHT history (untuk temperature)
+        _fetchApiData("/dht-history/latest", "dht"),
+        
+        // 3. Soil history (untuk kelembaban tanah)
+        _fetchApiData("/soil-history/latest", "soil"),
+        
+        // 4. Jarak history (untuk distance/level air)
+        _fetchApiData("/jarak-history/latest", "jarak"),
+        
+        // 5. TDS history (untuk TDS air)
+        _fetchApiData("/tds-history/latest", "tds"),
+      ]);
+
+      // Proses dan gabungkan data
+      final processedData = await _processAndMergeData(responses);
+      
+      setState(() {
+        sensorData = processedData;
+        isLoading = false;
+        useMockData = false;
+        errorMessage = "";
+      });
+      
+      print("✅ Berhasil memproses ${sensorData.length} data");
+      
+    } catch (e) {
+      print("❌ Error: $e");
+      
+      setState(() {
+        useMockData = true;
+        isLoading = false;
+        errorMessage = "Gagal mengambil data: ${e.toString()}";
+        sensorData = _generateMockData();
+      });
+    }
+  }
+
+  Future<Map<String, dynamic>> _fetchApiData(String endpoint, String type) async {
+    try {
+      final url = Uri.parse('$baseUrl$endpoint');
+      print("📡 Fetching $type data from: $url");
+      
+      final response = await http
+          .get(url)
+          .timeout(const Duration(seconds: 5));
+
+      print("📊 Response status: ${response.statusCode}");
+      
+      if (response.statusCode != 200) {
+        throw Exception("$type: Server Error ${response.statusCode}");
+      }
+
+      final Map<String, dynamic> decoded = json.decode(response.body);
+      print("📦 $type data received");
+      
+      return {'type': type, 'data': decoded, 'success': true};
+      
+    } catch (e) {
+      print("❌ Error fetching $type: $e");
+      return {'type': type, 'error': e.toString(), 'success': false};
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> _processAndMergeData(
+      List<Map<String, dynamic>> responses) async {
+    
+    // Ekstrak data dari setiap response
+    Map<String, dynamic>? actuatorData;
+    Map<String, dynamic>? dhtData;
+    Map<String, dynamic>? soilData;
+    Map<String, dynamic>? jarakData;
+    Map<String, dynamic>? tdsData;
+
+    for (var response in responses) {
+      if (response['success'] == true) {
+        final type = response['type'];
+        final data = response['data'];
+        
+        switch (type) {
+          case 'actuator':
+            actuatorData = data;
+            print("✅ Actuator data keys: ${data.keys}");
+            break;
+          case 'dht':
+            dhtData = data;
+            print("✅ DHT data - Temperature: ${data['temperature']}");
+            break;
+          case 'soil':
+            soilData = data;
+            print("✅ Soil data - Kelembaban: ${data['kelembaban_tanah']}");
+            break;
+          case 'jarak':
+            jarakData = data;
+            print("✅ Jarak data - Distance: ${data['distance_cm']} cm");
+            break;
+          case 'tds':
+            tdsData = data;
+            print("✅ TDS data - TDS: ${data['tds_ppm']} ppm");
+            break;
+        }
+      } else {
+        print("❌ Failed to fetch ${response['type']}: ${response['error']}");
+      }
+    }
+
+    // Jika tidak ada actuator data, kita tidak bisa buat history
+    if (actuatorData == null) {
+      throw Exception("Tidak ada data actuator history");
+    }
+
+    final List<Map<String, dynamic>> result = [];
+
+    // Handle jika actuator data dalam bentuk array atau object
+    List<dynamic> actuatorList = [];
+    
+    if (actuatorData.containsKey('data') && actuatorData['data'] is List) {
+      // Format: {"data": [...]}
+      actuatorList = actuatorData['data'];
+    } else if (actuatorData.containsKey('action')) {
+      // Format: langsung object {"action": "...", "timestamp": "..."}
+      actuatorList = [actuatorData];
+    } else {
+      throw Exception("Format actuator data tidak dikenali");
+    }
+
+    // Ambil data terbaru dari setiap sensor
+    final latestTemperature = _extractLatestValue(dhtData, 'temperature', '°C');
+    final latestSoilHumidity = _extractLatestValue(soilData, 'kelembaban_tanah', '%');
+    final latestDistance = _extractLatestValue(jarakData, 'distance_cm', '');
+    final latestTDS = _extractLatestValue(tdsData, 'tds_ppm', ' ppm');
+
+    // Hitung water level dari distance
+    String waterLevel = "N/A";
+    if (latestDistance != "N/A") {
+      try {
+        final distanceNum = double.parse(latestDistance);
+        waterLevel = _calculateWaterLevel(distanceNum);
+      } catch (e) {
+        waterLevel = "N/A";
+      }
+    }
+
+    // Untuk setiap data actuator (5 terbaru)
+    for (var actuator in actuatorList.take(5)) {
+      try {
+        // Parse timestamp dari actuator (field: "timestamp")
+        final actuatorTimestamp = actuator['timestamp']?.toString();
+        if (actuatorTimestamp == null) continue;
+        
+        final dateTime = DateTime.parse(actuatorTimestamp);
+        
+        // Format: "Minggu [2026-01-19 00:11:02]"
+        final dayName = _getIndonesianDay(dateTime.weekday);
+        final formattedDate = "${dateTime.year}-${dateTime.month.toString().padLeft(2, '0')}-${dateTime.day.toString().padLeft(2, '0')}";
+        final formattedTime = "${dateTime.hour.toString().padLeft(2, '0')}:${dateTime.minute.toString().padLeft(2, '0')}:${dateTime.second.toString().padLeft(2, '0')}";
+        
+        // Buat data untuk card ini
+        final cardData = {
+          'dayName': dayName,
+          'displayDate': "$formattedDate $formattedTime",
+          'timestamp': actuatorTimestamp,
+          'pumpStatus': actuator['action']?.toString() ?? "N/A",
+          'temperature': latestTemperature,
+          'soilHumidity': latestSoilHumidity,
+          'distance': latestDistance != "N/A" ? "$latestDistance cm" : "N/A",
+          'waterLevel': waterLevel,
+          'tds': latestTDS,
+          'isMockData': false,
+        };
+        
+        result.add(cardData);
+        
+        // Log data
+        print("\n📝 Card data:");
+        print("   Tanggal: $dayName [$formattedDate $formattedTime]");
+        print("   Pump: ${cardData['pumpStatus']}");
+        print("   Temperature: ${cardData['temperature']}");
+        print("   Soil: ${cardData['soilHumidity']}");
+        print("   Water Level: ${cardData['waterLevel']}");
+        print("   TDS: ${cardData['tds']}");
+        
+      } catch (e) {
+        print("⚠️ Error processing actuator: $e");
+      }
+    }
+    
+    return result;
+  }
+
+  String _extractLatestValue(
+    Map<String, dynamic>? sensorData, 
+    String valueKey,
+    String unit
+  ) {
+    if (sensorData == null) {
+      print("⚠️ Sensor data is null for key: $valueKey");
+      return "N/A";
+    }
+    
+    try {
+      // Cek apakah data langsung memiliki valueKey
+      if (sensorData.containsKey(valueKey)) {
+        final value = sensorData[valueKey];
+        print("✅ Found $valueKey: $value");
+        
+        if (value == null) return "N/A";
+        
+        if (value is num) {
+          return '${value.toStringAsFixed(1)}$unit';
+        } else if (value is String) {
+          try {
+            final numValue = double.parse(value);
+            return '${numValue.toStringAsFixed(1)}$unit';
+          } catch (e) {
+            return '$value$unit';
+          }
+        }
+        return '$value$unit';
+      }
+      
+      // Cek jika ada nested data
+      if (sensorData.containsKey('data') && sensorData['data'] is List) {
+        final List<dynamic> dataList = sensorData['data'];
+        if (dataList.isNotEmpty) {
+          final firstItem = dataList.first;
+          if (firstItem is Map && firstItem.containsKey(valueKey)) {
+            final value = firstItem[valueKey];
+            print("✅ Found $valueKey in array: $value");
+            
+            if (value is num) {
+              return '${value.toStringAsFixed(1)}$unit';
+            }
+            return '$value$unit';
+          }
+        }
+      }
+      
+      print("❌ Key $valueKey not found");
+      return "N/A";
+      
+    } catch (e) {
+      print("⚠️ Error extracting value: $e");
+      return "N/A";
+    }
+  }
+
+  String _calculateWaterLevel(double distance) {
+    const maxDistance = 30.0;
+    const minDistance = 10.0;
+    
+    if (distance <= minDistance) return "100%";
+    if (distance >= maxDistance) return "0%";
+    
+    final percentage = 100 - ((distance - minDistance) / (maxDistance - minDistance)) * 100;
+    return "${percentage.toStringAsFixed(0)}%";
+  }
+
+  String _getIndonesianDay(int weekday) {
+    final days = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
+    return days[weekday % 7];
+  }
+
+  List<Map<String, dynamic>> _generateMockData() {
+    final now = DateTime.now();
+    final List<Map<String, dynamic>> mockData = [];
+    
+    for (int i = 0; i < 5; i++) {
+      final d = now.subtract(Duration(hours: i * 3));
+      final dayName = _getIndonesianDay(d.weekday);
+      final formattedDate = "${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}";
+      final formattedTime = "${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}:${d.second.toString().padLeft(2, '0')}";
+      
+      mockData.add({
+        'dayName': dayName,
+        'displayDate': "$formattedDate $formattedTime",
+        'temperature': "${25 + i}°C",
+        'soilHumidity': "${30 + i * 5}%",
+        'distance': "${20 + i} cm",
+        'waterLevel': "${80 - i * 15}%",
+        'tds': "${100 + i * 50} ppm",
+        'pumpStatus': i % 2 == 0 ? "ON" : "OFF",
+        'isMockData': true,
+      });
+    }
+    
+    return mockData;
+  }
+
+  String _formatValue(String value) {
+    if (value == "N/A" || value.isEmpty) {
+      return "-";
+    }
+    return value;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (isLoading) {
+      return const Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            CircularProgressIndicator(),
+            SizedBox(height: 10),
+            Text(
+              "Memuat data sensor...",
+              style: TextStyle(fontSize: 14, color: Colors.grey),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return RefreshIndicator(
+      onRefresh: fetchAllSensorData,
+      child: SingleChildScrollView(
+        physics: const ScrollPhysics(),
+        child: Column(
+          children: [
+            // Error message jika menggunakan mock data
+            if (useMockData && errorMessage.isNotEmpty)
+              Container(
+                margin: const EdgeInsets.symmetric(horizontal: 15, vertical: 8),
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: Colors.orange.shade100,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.orange),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.warning, color: Colors.orange, size: 20),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        "Menggunakan data simulasi\n$errorMessage",
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: Colors.orange,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+            // Total data info
+            Container(
+              margin: const EdgeInsets.symmetric(horizontal: 15, vertical: 5),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: const Color.fromARGB(255, 138, 231, 146),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: const Color.fromARGB(255, 255, 255, 255),
+                ),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    "📊 Total Data: ${sensorData.length}",
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: Colors.green.shade800,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: useMockData
+                          ? Colors.orange.shade100
+                          : Colors.green.shade100,
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      useMockData ? "📋 Simulasi" : "🌐 Real-time",
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: useMockData
+                            ? Colors.orange.shade800
+                            : Colors.green.shade800,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 10),
+            
+            // List data
+            ...sensorData.map(
+              (data) => Card(
+                margin: const EdgeInsets.only(left: 15, right: 15, bottom: 10),
+                color: useMockData
+                    ? const Color.fromARGB(255, 49, 84, 50)
+                    : const Color.fromARGB(255, 34, 74, 36),
+                child: ListTile(
+                  contentPadding: const EdgeInsets.all(12),
+                  title: Text(
+                    "${data['dayName']} [${data['displayDate']}]",
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  subtitle: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        height: 3,
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        margin: const EdgeInsets.only(top: 5, bottom: 5),
+                      ),
+                      Text(
+                        "🌡 Suhu Ruangan: ${_formatValue(data['temperature'])}",
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      Text(
+                        "🌱 Kelembaban Tanah: ${_formatValue(data['soilHumidity'])}",
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      Text(
+                        "📊 Level Air: ${_formatValue(data['waterLevel'])}",
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      Text(
+                        "💧 TDS Air: ${_formatValue(data['tds'])}",
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      Text(
+                        "⚡ Kondisi Pump: ${_formatValue(data['pumpStatus'])}",
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}

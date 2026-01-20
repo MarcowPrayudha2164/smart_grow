@@ -57,7 +57,7 @@ class _BodyHistoryUserState extends State<BodyHistoryUser> {
         Container(
           margin: const EdgeInsets.only(left: 15, top: 5),
           child: const Text(
-            "Halo KONTOL, Selamat Datang 👋",
+            "Halo Bro, Selamat Datang 👋",
             style: TextStyle(
               fontSize: 13,
               color: textColor,
@@ -93,7 +93,6 @@ class _BodyHistoryUserState extends State<BodyHistoryUser> {
             ],
           ),
         ),
-        const SizedBox(height: 10),
         const WidgetHistoryData(),
       ],
     );

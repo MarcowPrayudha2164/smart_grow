@@ -11,11 +11,12 @@ class WidgetMonitoringData extends StatefulWidget {
 
 class _WidgetMonitoringDataState extends State<WidgetMonitoringData> {
   final RabbitMQSingleton _rabbitMQ = RabbitMQSingleton();
- 
-  // Data semua sensor
+
+  // Data sensors
   double _temperature = 0.0;
   int _soilHumidity = 0;
   double _waterLevel = 0.0;
+  double _waterLevelPercentage = 0.0;
   double _waterQuality = 0.0;
   double _ph = 6.2;
 
@@ -46,7 +47,6 @@ class _WidgetMonitoringDataState extends State<WidgetMonitoringData> {
     _rabbitMQ.dataStream.listen((data) {
       if (mounted) {
         setState(() {
-          // Update semua data dari singleton
           _temperature = _rabbitMQ.temperature;
           _hasTempData = _rabbitMQ.hasTempData;
 
@@ -54,6 +54,8 @@ class _WidgetMonitoringDataState extends State<WidgetMonitoringData> {
           _hasSoilData = _rabbitMQ.hasSoilData;
 
           _waterLevel = _rabbitMQ.waterLevel;
+          _waterLevelPercentage = _rabbitMQ
+              .getWaterLevelPercentage(); // Ambil persentase
           _hasWaterLevelData = _rabbitMQ.hasWaterLevelData;
 
           _waterQuality = _rabbitMQ.waterQuality;
@@ -91,8 +93,8 @@ class _WidgetMonitoringDataState extends State<WidgetMonitoringData> {
           const SizedBox(height: 10),
           _buildWaterQualityCard(),
           const SizedBox(height: 10),
-          _buildPhCard(),
-          // Connection Status
+
+          // _buildPhCard(),
           const SizedBox(height: 20),
           _buildConnectionStatus(),
         ],
@@ -111,13 +113,14 @@ class _WidgetMonitoringDataState extends State<WidgetMonitoringData> {
       value: value,
       isActive: isActive,
       activeColor: Colors.grey,
-      iconColor: greenColor,
+      iconColor: Colors.redAccent,
     );
   }
 
   Widget _buildSoilHumidityCard() {
     final value = _hasSoilData ? "$_soilHumidity%" : "0%";
     final isActive = _hasSoilData;
+
     return _buildSensorCard(
       label: "Kelembapan",
       subLabel: "Sensor Soil",
@@ -125,24 +128,114 @@ class _WidgetMonitoringDataState extends State<WidgetMonitoringData> {
       icon: Icons.grass_outlined,
       isActive: isActive,
       activeColor: Colors.brown,
-      iconColor: greenColor,
+      iconColor: Colors.lightGreen,
     );
   }
 
   Widget _buildWaterLevelCard() {
-    final value = _hasWaterLevelData
-        ? "${_waterLevel.toStringAsFixed(1)} cm"
-        : "0 cm";
+    String displayText;
+    if (_hasWaterLevelData) {
+      displayText = "${_waterLevelPercentage.toStringAsFixed(0)}%";
+    } else {
+      displayText = "0%";
+    }
+
     final isActive = _hasWaterLevelData;
 
-    return _buildSensorCard(
-      label: "Level Air",
-      subLabel: "Sensor Jarak",
-      icon: Icons.water_outlined,
-      value: value,
-      isActive: isActive,
-      activeColor: Colors.grey,
-      iconColor: greenColor,
+    return Container(
+      margin: const EdgeInsets.only(right: 15, left: 15),
+      padding: const EdgeInsets.all(15),
+      decoration: BoxDecoration(
+        color: secondaryColor,
+        borderRadius: BorderRadius.circular(25),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black,
+            blurRadius: 5,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Container(
+            width: 8,
+            height: 60,
+            margin: const EdgeInsets.only(right: 10),
+            decoration: BoxDecoration(
+              color: isActive ? Colors.green : Colors.grey,
+              borderRadius: BorderRadius.circular(4),
+            ),
+          ),
+          Container(
+            constraints: const BoxConstraints(minWidth: 100),
+            padding: const EdgeInsets.all(10),
+            margin: const EdgeInsets.only(right: 10),
+            decoration: BoxDecoration(
+              color: primaryColor,
+              borderRadius: BorderRadius.circular(15),
+            ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  "Level Air",
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    color: secondaryColor,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  "Sensor Jarak",
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 10, color: textColor),
+                ),
+              ],
+            ),
+          ),
+          Container(
+            margin: const EdgeInsets.only(right: 10),
+            child: Icon(
+              Icons.water_outlined,
+              color: isActive ? const Color.fromARGB(255, 59, 159, 241) : Colors.grey,
+              size: 35,
+            ),
+          ),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  displayText,
+                  style: TextStyle(
+                    fontSize: 30,
+                    color: isActive ? primaryColor : Colors.grey,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                if (!isActive)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: Text(
+                      'Menunggu data...',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: Colors.grey[600],
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -158,22 +251,8 @@ class _WidgetMonitoringDataState extends State<WidgetMonitoringData> {
       icon: Icons.water_drop_rounded,
       value: value,
       isActive: isActive,
-      activeColor: Colors.grey,
+      activeColor: Colors.green,
       iconColor: Colors.teal,
-    );
-  }
-
-  Widget _buildPhCard() {
-    const value = "6.2 pH";
-    const isActive = false;
-    return _buildSensorCard(
-      label: "PH Air",
-      subLabel: "PH Sensor",
-      icon: Icons.water_drop_outlined,
-      value: value,
-      isActive: isActive,
-      activeColor: Colors.purple,
-      iconColor: greenColor,
     );
   }
 
@@ -192,13 +271,9 @@ class _WidgetMonitoringDataState extends State<WidgetMonitoringData> {
       decoration: BoxDecoration(
         color: secondaryColor,
         borderRadius: BorderRadius.circular(25),
-        border: Border.all(
-          color: isActive ? activeColor : Colors.grey,
-          width: 2,
-        ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: textColor,
             blurRadius: 5,
             offset: const Offset(0, 2),
           ),
@@ -208,7 +283,6 @@ class _WidgetMonitoringDataState extends State<WidgetMonitoringData> {
         mainAxisAlignment: MainAxisAlignment.start,
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          // Status Indicator
           Container(
             width: 8,
             height: 60,
@@ -218,18 +292,12 @@ class _WidgetMonitoringDataState extends State<WidgetMonitoringData> {
               borderRadius: BorderRadius.circular(4),
             ),
           ),
-
-          // Label Container
           Container(
             constraints: const BoxConstraints(minWidth: 100),
             padding: const EdgeInsets.all(10),
             margin: const EdgeInsets.only(right: 10),
             decoration: BoxDecoration(
               color: primaryColor,
-              border: Border.all(
-                color: isActive ? activeColor : Colors.grey,
-                width: 2,
-              ),
               borderRadius: BorderRadius.circular(15),
             ),
             child: Column(
@@ -253,16 +321,14 @@ class _WidgetMonitoringDataState extends State<WidgetMonitoringData> {
               ],
             ),
           ),
-          // Icon
           Container(
             margin: const EdgeInsets.only(right: 5),
             child: Icon(
               icon,
               color: isActive ? iconColor : Colors.grey,
-              size: 33,
+              size: 35,
             ),
           ),
-          // Value
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -273,7 +339,7 @@ class _WidgetMonitoringDataState extends State<WidgetMonitoringData> {
                   child: Text(
                     value,
                     style: TextStyle(
-                      fontSize: 20,
+                      fontSize: 25,
                       color: isActive ? primaryColor : Colors.grey,
                       fontWeight: FontWeight.bold,
                     ),
@@ -304,12 +370,12 @@ class _WidgetMonitoringDataState extends State<WidgetMonitoringData> {
       if (_hasTempData) 'Suhu',
       if (_hasSoilData) 'Tanah',
       if (_hasWaterLevelData) 'Level Air',
-      if (_hasWaterQualityData) 'Kualitas',
-      if (_hasPhData) 'pH',
+      if (_hasWaterQualityData) 'Kualitas Air',
+      // if (_hasPhData) 'pH',
     ];
 
     final activeCount = activeSensors.length;
-    final totalSensors = 5;
+    final totalSensors = 4;
 
     return Container(
       padding: const EdgeInsets.all(10),
@@ -323,8 +389,6 @@ class _WidgetMonitoringDataState extends State<WidgetMonitoringData> {
         ),
       ),
       child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -357,7 +421,7 @@ class _WidgetMonitoringDataState extends State<WidgetMonitoringData> {
               ),
             ],
           ),
-          // Progress bar
+
           Padding(
             padding: const EdgeInsets.only(top: 10),
             child: LinearProgressIndicator(
@@ -370,7 +434,7 @@ class _WidgetMonitoringDataState extends State<WidgetMonitoringData> {
               borderRadius: BorderRadius.circular(4),
             ),
           ),
-          // Active sensors list
+
           if (activeSensors.isNotEmpty)
             Padding(
               padding: const EdgeInsets.only(top: 10),
@@ -396,8 +460,6 @@ class _WidgetMonitoringDataState extends State<WidgetMonitoringData> {
                 }).toList(),
               ),
             ),
-
-          // Reconnect button jika disconnected
           if (!_isConnected)
             Padding(
               padding: const EdgeInsets.only(top: 10),

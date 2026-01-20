@@ -19,7 +19,6 @@ class RabbitMQSingleton {
   int soilHumidity = 0;
   double temperature = 0.0;
   double waterLevel = 0.0; // distance_cm dari jarak_apps
-  double waterLevelPercentage = 0.0; // Persentase level air (0-100%)
   double waterQuality = 0.0;
   double ph = 6.2;
 
@@ -108,23 +107,21 @@ class RabbitMQSingleton {
       }
     };
 
-    // Handler untuk jarak_apps - LEVEL AIR dengan persentase
+    // Handler untuk jarak_apps - LEVEL AIR dengan kondisi Penuh/Kosong
     _handlers['water_level'] = (Map<String, dynamic> data) {
       final distance = data['distance_cm'];
       if (distance != null) {
         waterLevel = _parseDouble(distance);
-        waterLevelPercentage = _calculateWaterPercentage(waterLevel);
         hasWaterLevelData = true;
 
-        // Tentukan status Penuh/Kosong (untuk kompatibilitas)
+        // Tentukan status Penuh/Kosong
         final waterStatus = _getWaterStatus(waterLevel);
-        print('💧 Water level: ${waterLevel.toStringAsFixed(1)}cm → ${waterLevelPercentage.toStringAsFixed(0)}% → Status: $waterStatus');
+        print('💧 Water level: ${waterLevel}cm → Status: $waterStatus');
 
         _dataController.add({
           'type': 'water_level',
           'value': waterLevel,
-          'percentage': waterLevelPercentage, // Tambah persentase
-          'status': waterStatus,
+          'status': waterStatus, // Tambah status Penuh/Kosong
           'raw_data': data,
           'timestamp': DateTime.now().millisecondsSinceEpoch,
         });
@@ -149,30 +146,7 @@ class RabbitMQSingleton {
     };
   }
 
-  // Fungsi untuk menghitung persentase air berdasarkan jarak
-  double _calculateWaterPercentage(double distance) {
-    // Konstanta: 12cm = 100%, 30cm = 0%
-    const double FULL_DISTANCE = 12.0;
-    const double EMPTY_DISTANCE = 30.0;
-    
-    // Pastikan distance dalam range yang valid
-    if (distance <= FULL_DISTANCE) {
-      return 100.0;
-    } else if (distance >= EMPTY_DISTANCE) {
-      return 0.0;
-    } else {
-      // Hitung persentase: semakin dekat dengan FULL_DISTANCE, semakin besar persentase
-      double percentage = ((EMPTY_DISTANCE - distance) / (EMPTY_DISTANCE - FULL_DISTANCE)) * 100;
-      return double.parse(percentage.toStringAsFixed(1));
-    }
-  }
-
-  // Method untuk mendapatkan persentase air
-  double getWaterLevelPercentage() {
-    return waterLevelPercentage;
-  }
-
-  // Fungsi untuk menentukan status air berdasarkan jarak (untuk kompatibilitas)
+  // Fungsi untuk menentukan status air berdasarkan jarak
   String _getWaterStatus(double distance) {
     // Aturan:
     // - Jika jarak <= 12cm → "Penuh" 🟢
@@ -209,21 +183,6 @@ class RabbitMQSingleton {
     }
   }
 
-  // Untuk mendapatkan warna berdasarkan persentase (gradasi dari merah ke hijau)
-  Color getWaterLevelColorByPercentage() {
-    if (waterLevelPercentage >= 80) {
-      return Colors.green;
-    } else if (waterLevelPercentage >= 50) {
-      return Colors.greenAccent;
-    } else if (waterLevelPercentage >= 30) {
-      return Colors.yellow;
-    } else if (waterLevelPercentage >= 10) {
-      return Colors.orange;
-    } else {
-      return Colors.red;
-    }
-  }
-
   // Untuk mendapatkan emoji berdasarkan status
   String getWaterLevelEmoji() {
     final status = getWaterLevelStatus();
@@ -237,19 +196,6 @@ class RabbitMQSingleton {
         return "🔴";
       default:
         return "⚪";
-    }
-  }
-
-  // Untuk mendapatkan emoji berdasarkan persentase
-  String getWaterLevelEmojiByPercentage() {
-    if (waterLevelPercentage >= 80) {
-      return "💧💧💧";
-    } else if (waterLevelPercentage >= 50) {
-      return "💧💧";
-    } else if (waterLevelPercentage >= 20) {
-      return "💧";
-    } else {
-      return "💧🔥";
     }
   }
 

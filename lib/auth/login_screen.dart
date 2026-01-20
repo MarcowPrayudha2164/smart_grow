@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:smart_grow/components/colors.dart';
 import 'package:smart_grow/components/size_config.dart';
 import 'package:smart_grow/auth/component_login.dart' show ComponentFormLogin;
-import 'package:smart_grow/pages/admin/admin_dashboard.dart';
 
 class LoginScreen extends StatelessWidget {
   const LoginScreen({super.key});
